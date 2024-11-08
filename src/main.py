@@ -13,16 +13,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Main driver function for APT')
     parser.add_argument('--config', '-c', help='Path to the config file')
     parser.add_argument('--audio_dir', '-a', help='Path to the audio directory')
+    parser.add_argument('--output_dir', '-o', help='Path to the output directory')
 
     args = parser.parse_args()
 
-    if args.config is None or args.audio_dir is None:
+    if args.config is None or args.audio_dir is None or args.output_dir is None:
         parser.print_usage()
         exit()
 
     return args
 
-def configure_logging() -> logging.Logger:
+def configure_logging(request_id: str) -> logging.Logger:
     """Sets up a useful logger."""
 
     # suppress tonnes of post request clogging up logging
@@ -41,8 +42,7 @@ def configure_logging() -> logging.Logger:
     console_handler.setLevel(logging.INFO)
 
     # set up console to output to log file
-    # TO DO - add audio filename as logfile name
-    file_handler = logging.FileHandler(f'{os.getcwd()}/logs/apt.log',
+    file_handler = logging.FileHandler(f'{os.getcwd()}/logs/{request_id}.log',
                                       mode = 'w')
     file_handler.setLevel(logging.DEBUG)
 
@@ -60,15 +60,15 @@ def configure_logging() -> logging.Logger:
 
 def main():
 
-    logger = configure_logging()
-    args = parse_args()
-
     request_id = str(uuid.uuid4())
+
+    logger = configure_logging(request_id)
+    args = parse_args()
 
     # load in config values from both .env and config json given
     config = dotenv_values(".env") | load_json(args.config)
 
-    logger.info('Beginning APT: Request ID {request_id}...')
+    logger.info(f'Beginning APT: Request ID {request_id}...')
 
     blob_handler = AzureBlobHandler(audio_dir=args.audio_dir,
                                     blob_key=config['AZ_BLOB_KEY'],
@@ -78,7 +78,7 @@ def main():
 
     container_client = blob_handler.upload_to_blob()
 
-    # TO DO - transcription, assigning speakers etc.
+    # TO DO - transcription, assigning speakers using GPT/OpenAI stuff
 
     # at some point after transcription, delete the container that had the audio in it
     # container_client.delete_container()
