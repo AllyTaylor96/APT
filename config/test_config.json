@@ -1,4 +1,7 @@
 {
+    "transcription": {
+        "whisperModel": "turbo"
+    },
 	"speakers": [
 		"Brad",
 		"Will"

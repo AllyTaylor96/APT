@@ -3,10 +3,8 @@ import logging
 import os
 import uuid
 
-from dotenv import dotenv_values
-
-from azure_handlers import AzureBlobHandler
 from io_functions import load_json
+from transcribers import WhisperTranscriber
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,13 +23,6 @@ def parse_args() -> argparse.Namespace:
 
 def configure_logging(request_id: str) -> logging.Logger:
     """Sets up a useful logger."""
-
-    # suppress tonnes of post request clogging up logging
-    logging.getLogger("requests").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpx").propagate = False
-    logging.getLogger("azure").setLevel(logging.WARNING)
-    logging.getLogger("azure").propagate = False
 
     # create project-specific logger
     logger = logging.getLogger('apt')
@@ -57,7 +48,6 @@ def configure_logging(request_id: str) -> logging.Logger:
 
     return logger
 
-
 def main():
 
     request_id = str(uuid.uuid4())
@@ -65,25 +55,21 @@ def main():
     logger = configure_logging(request_id)
     args = parse_args()
 
-    # load in config values from both .env and config json given
-    config = dotenv_values(".env") | load_json(args.config)
+    config = load_json(args.config)
+    requested_model = config['transcription']['whisperModel']
 
-    logger.info(f'Beginning APT: Request ID {request_id}...')
+    logger.info(f'AnotherPodcastTranscriber - Request ID: {request_id}...')
 
-    blob_handler = AzureBlobHandler(audio_dir=args.audio_dir,
-                                    blob_key=config['AZ_BLOB_KEY'],
-                                    blob_container_link=config['AZ_BLOB_CONTAINER_LINK'],
-                                    request_id=request_id)
+    logger.info(f'Whisper - Model requested: {requested_model}...')
+    transcription_handler = WhisperTranscriber(
+        audio_dir=args.audio_dir,
+        output_dir=args.output_dir,
+        request_id=request_id,
+        requested_model=requested_model
+    )
+    logger.info(f'Whisper - Model instantiated...')
 
-
-    container_client = blob_handler.upload_to_blob()
-
-    # TO DO - transcription, assigning speakers using GPT/OpenAI stuff
-
-    # at some point after transcription, delete the container that had the audio in it
-    # container_client.delete_container()
-
-
+    transcription_handler.run_transcription()
 
 if __name__ == "__main__":
     main()
